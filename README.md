@@ -44,8 +44,8 @@ Reelzzz is a backend service built using **Node.js**, **Express**, and **MongoDB
 ## Installation
 ### 1️⃣ Clone the repository
 ```sh
-git clone https://github.com/yourusername/reelzzz_backend.git
-cd reelzzz_backend
+https://github.com/ddheer29/reelzzz_nodejs/tree/main
+cd reelzzz_nodejs
 ```
 
 ### 2️⃣ Install dependencies
