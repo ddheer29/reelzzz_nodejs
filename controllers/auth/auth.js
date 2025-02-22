@@ -127,7 +127,14 @@ const signInWithOauth = async (req, res) => {
         `https://graph.facebook.com/v20.0/me?access_token=${id_token}&fields=id,email`
       );
       console.log("🚀 ~ signInWithOauth ~ data:", data);
+
       verifiedEmail = data.email;
+
+      if (!verifiedEmail) {
+        throw new UnauthenticatedError(
+          "Facebook account does not provide an email."
+        );
+      }
     }
 
     if (provider === "google") {
@@ -137,18 +144,27 @@ const signInWithOauth = async (req, res) => {
       });
       const payload = ticket.getPayload();
       verifiedEmail = payload.email;
+
+      if (!verifiedEmail) {
+        throw new UnauthenticatedError(
+          "Google account does not provide an email."
+        );
+      }
     }
 
+    // Check if user exists
     const user = await User.findOne({ email: verifiedEmail }).select(
       "-followers -following"
     );
-    const followersCount = await User.countDocuments({ following: user._id });
-    const followingCount = await User.countDocuments({ followers: user._id });
-    const reelsCount = await Reel.countDocuments({ user: user._id });
 
     if (!user) {
       throw new NotFoundError("User does not exist");
     }
+
+    // Fetch counts only if user is found
+    const followersCount = await User.countDocuments({ following: user._id });
+    const followingCount = await User.countDocuments({ followers: user._id });
+    const reelsCount = await Reel.countDocuments({ user: user._id });
 
     const accessToken = user.createAccessToken();
     const refreshToken = user.createRefreshToken();
