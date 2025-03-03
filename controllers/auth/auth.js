@@ -259,8 +259,9 @@ const loginWithEmail = async (req, res) => {
     const passwordCheck = await bcrypt.compare(password, user.password);
 
     if(passwordCheck){
-      const token = user.createAccessToken();
-      return res.status(StatusCodes.OK).json({ message: "Logged in successfully", token })
+      const newAccessToken = user.createAccessToken();
+      const newRefreshToken = user.createRefreshToken();
+      return res.status(StatusCodes.OK).json({ message: "Logged in successfully", tokens: { access_token: newAccessToken, refresh_token: newRefreshToken } })
     } else {
       throw new UnauthenticatedError("Password didn't matched")
     }
