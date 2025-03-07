@@ -12,6 +12,7 @@ app.use(express.json());
 
 // Routers
 const authRouter = require("./routes/auth");
+const oauthRouter = require("./routes/oauth");
 const fileRouter = require("./routes/file");
 const commentRouter = require("./routes/comment");
 const likeRouter = require("./routes/like");
@@ -22,7 +23,8 @@ const user = require("./routes/user");
 const replyRouter = require("./routes/reply");
 const shareRouter = require("./routes/share");
 
-app.use("/oauth", authRouter);
+app.use("/auth", authRouter);
+app.use("/oauth", oauthRouter);
 app.use("/file", fileRouter);
 app.use("/share", shareRouter);
 app.use("/user", authMiddleware, user);

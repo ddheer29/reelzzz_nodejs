@@ -10,6 +10,7 @@ const { OAuth2Client } = require("google-auth-library");
 const axios = require("axios");
 const Reward = require("../../models/Reward");
 const Reel = require("../../models/Reel");
+const bcrypt = require('bcrypt');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -215,9 +216,67 @@ const refreshToken = async (req, res) => {
   }
 };
 
+const signUpWithEmail = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if(!email || !password){
+      throw new BadRequestError("Invalid body request");
+    }
+
+    const findUser = await User.findOne({ email: email });
+
+    if(findUser){
+      return res.status(StatusCodes.CONFLICT).json({ message: "Email already exists. Please login."});
+    }
+
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    const newUser = new User({ email, password: hashedPassword, username: "", userImage: "", bio: "" });
+    await newUser.save();
+
+    return res.status(StatusCodes.CREATED).json({ message: "User created successfully." });
+
+  } catch(err) {
+    console.log(err);
+    throw new BadRequestError("Singup failed. Please try again later!");
+  }
+}
+
+const loginWithEmail = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if(!email || !password){
+      throw new BadRequestError("Invalid body request");
+    }
+
+    const user = await User.findOne({ email });
+    if(!user){
+      throw new NotFoundError("User not found")
+    }
+
+    const passwordCheck = await bcrypt.compare(password, user.password);
+
+    if(passwordCheck){
+      const newAccessToken = user.createAccessToken();
+      const newRefreshToken = user.createRefreshToken();
+      return res.status(StatusCodes.OK).json({ message: "Logged in successfully", tokens: { access_token: newAccessToken, refresh_token: newRefreshToken } })
+    } else {
+      throw new UnauthenticatedError("Password didn't matched")
+    }
+  }
+  catch(err) {
+    console.log(err);
+    throw new BadRequestError("Unable to login. Please try again later.")
+  }
+}
+
 module.exports = {
   signInWithOauth,
   signUpWithOauth,
   refreshToken,
   checkUsernameAvailability,
+  signUpWithEmail,
+  loginWithEmail
 };
