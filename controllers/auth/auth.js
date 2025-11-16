@@ -10,7 +10,9 @@ const { OAuth2Client } = require("google-auth-library");
 const axios = require("axios");
 const Reward = require("../../models/Reward");
 const Reel = require("../../models/Reel");
-const bcrypt = require('bcrypt');
+const otpGenerator = require("otp-generator");
+
+let otpStore = {};
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -216,67 +218,104 @@ const refreshToken = async (req, res) => {
   }
 };
 
-const signUpWithEmail = async (req, res) => {
+const sendOtp = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if(!email || !password){
-      throw new BadRequestError("Invalid body request");
+    const { phoneNumber } = req.body;
+
+    if (!phoneNumber) {
+      throw new BadRequestError("Phone number is required");
     }
 
-    const findUser = await User.findOne({ email: email });
+    const otp = otpGenerator.generate(6, {
+      digits: true,
+      alphabets: false,
+      upperCase: false,
+      specialChars: false,
+    });
 
-    if(findUser){
-      return res.status(StatusCodes.CONFLICT).json({ message: "Email already exists. Please login."});
-    }
+    // Store OTP temporarily (5 min expiry)
+    otpStore[phoneNumber] = {
+      otp,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+    };
 
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    console.log(`OTP for ${phoneNumber}: ${otp}`); // Replace with SMS service
 
-    const newUser = new User({ email, password: hashedPassword, username: "", userImage: "", bio: "" });
-    await newUser.save();
-
-    return res.status(StatusCodes.CREATED).json({ message: "User created successfully." });
-
-  } catch(err) {
-    console.log(err);
-    throw new BadRequestError("Singup failed. Please try again later!");
+    return res
+      .status(StatusCodes.OK)
+      .json({ message: "OTP sent successfully" });
+  } catch (error) {
+    console.error(error);
+    throw new BadRequestError("Failed to send OTP");
   }
-}
+};
 
-const loginWithEmail = async (req, res) => {
+const verifyOtp = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { phoneNumber, otp } = req.body;
 
-    if(!email || !password){
-      throw new BadRequestError("Invalid body request");
+    if (!phoneNumber || !otp) {
+      throw new BadRequestError("Phone number and OTP are required");
     }
 
-    const user = await User.findOne({ email });
-    if(!user){
-      throw new NotFoundError("User not found")
+    const stored = otpStore[phoneNumber];
+    if (!stored) {
+      throw new UnauthenticatedError("No OTP request found for this number");
     }
 
-    const passwordCheck = await bcrypt.compare(password, user.password);
-
-    if(passwordCheck){
-      const newAccessToken = user.createAccessToken();
-      const newRefreshToken = user.createRefreshToken();
-      return res.status(StatusCodes.OK).json({ message: "Logged in successfully", tokens: { access_token: newAccessToken, refresh_token: newRefreshToken } })
-    } else {
-      throw new UnauthenticatedError("Password didn't matched")
+    if (Date.now() > stored.expiresAt) {
+      delete otpStore[phoneNumber];
+      throw new UnauthenticatedError("OTP expired");
     }
+
+    if (stored.otp !== otp) {
+      throw new UnauthenticatedError("Invalid OTP");
+    }
+
+    // OTP verified
+    delete otpStore[phoneNumber];
+
+    // Check if user exists
+    let user = await User.findOne({ phoneNumber });
+
+    if (!user) {
+      // Create a new user
+      user = new User({
+        phoneNumber,
+        username: `user_${Math.floor(Math.random() * 1000000)}`,
+        name: "",
+        userImage: "",
+        bio: "",
+      });
+      await user.save();
+    }
+
+    const accessToken = user.createAccessToken();
+    const refreshToken = user.createRefreshToken();
+
+    res.status(StatusCodes.OK).json({
+      message: "OTP verified successfully",
+      user: {
+        id: user._id,
+        phoneNumber: user.phoneNumber,
+        username: user.username,
+        name: user.name,
+        userImage: user.userImage,
+        bio: user.bio,
+      },
+      tokens: { access_token: accessToken, refresh_token: refreshToken },
+    });
+  } catch (error) {
+    console.error(error);
+    throw new BadRequestError("OTP verification failed");
   }
-  catch(err) {
-    console.log(err);
-    throw new BadRequestError("Unable to login. Please try again later.")
-  }
-}
+};
 
 module.exports = {
   signInWithOauth,
   signUpWithOauth,
   refreshToken,
   checkUsernameAvailability,
-  signUpWithEmail,
-  loginWithEmail
+  sendOtp,
+  verifyOtp,
 };

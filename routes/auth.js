@@ -1,8 +1,19 @@
 const express = require("express");
 const router = express.Router();
-const { signUpWithEmail, loginWithEmail } = require("../controllers/auth/auth");
+const {
+  signUpWithOauth,
+  signInWithOauth,
+  refreshToken,
+  checkUsernameAvailability,
+  sendOtp,
+  verifyOtp,
+} = require("../controllers/auth/auth");
 
-router.post("/register", signUpWithEmail );
-router.post("/login", loginWithEmail );
+router.post("/signup-oauth", signUpWithOauth);
+router.post("/signin-oauth", signInWithOauth);
+router.post("/refresh", refreshToken);
+router.post("/check-username", checkUsernameAvailability);
+router.post("/send-otp", sendOtp);
+router.post("/verify-otp", verifyOtp);
 
 module.exports = router;
