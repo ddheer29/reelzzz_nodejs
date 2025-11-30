@@ -16,6 +16,14 @@ let otpStore = {};
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+function generateOtp(length = 6) {
+  let otp = "";
+  for (let i = 0; i < length; i++) {
+    otp += Math.floor(Math.random() * 10);
+  }
+  return otp;
+}
+
 const checkUsernameAvailability = async (req, res) => {
   const { username } = req.body;
 
@@ -226,12 +234,7 @@ const sendOtp = async (req, res) => {
       throw new BadRequestError("Phone number is required");
     }
 
-    const otp = otpGenerator.generate(6, {
-      digits: true,
-      alphabets: false,
-      upperCase: false,
-      specialChars: false,
-    });
+    const otp = generateOtp(6);
 
     // Store OTP temporarily (5 min expiry)
     otpStore[phoneNumber] = {
@@ -279,15 +282,15 @@ const verifyOtp = async (req, res) => {
     let user = await User.findOne({ phoneNumber });
 
     if (!user) {
-      // Create a new user
+      // Create a new user with ONLY the fields that exist in your User model
       user = new User({
         phoneNumber,
-        username: `user_${Math.floor(Math.random() * 1000000)}`,
-        name: "",
-        userImage: "",
-        bio: "",
+        name: "", // User can update this later in profile
+        userImage: "", // User can update this later in profile
+        // Don't include username, bio, or any other fields that don't exist in your model
       });
       await user.save();
+      console.log("🚀 New user created with phone:", phoneNumber);
     }
 
     const accessToken = user.createAccessToken();
@@ -298,15 +301,24 @@ const verifyOtp = async (req, res) => {
       user: {
         id: user._id,
         phoneNumber: user.phoneNumber,
-        username: user.username,
         name: user.name,
         userImage: user.userImage,
-        bio: user.bio,
+        email: user.email,
+        addressLine1: user.addressLine1,
+        addressLine2: user.addressLine2,
+        addressType: user.addressType,
+        dateOfBirth: user.dateOfBirth,
       },
       tokens: { access_token: accessToken, refresh_token: refreshToken },
     });
   } catch (error) {
-    console.error(error);
+    console.error("OTP verification error:", error);
+
+    // Handle duplicate phone number error
+    if (error.code === 11000 && error.keyPattern?.phoneNumber) {
+      throw new BadRequestError("Phone number already registered");
+    }
+
     throw new BadRequestError("OTP verification failed");
   }
 };
