@@ -111,6 +111,86 @@ const getAllSalons = async (req, res) => {
   }
 };
 
+const getNearbySalons = async (req, res) => {
+  try {
+    const { latitude, longitude, radius = 5 } = req.query;
+
+    if (!latitude || !longitude) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide latitude and longitude",
+      });
+    }
+
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+    const radiusInKm = parseFloat(radius);
+
+    // Earth's radius in kilometers
+    const earthRadius = 6371;
+
+    // Calculate bounding box for initial filtering
+    const latDelta = (radiusInKm / earthRadius) * (180 / Math.PI);
+    const lngDelta = latDelta / Math.cos((lat * Math.PI) / 180);
+
+    const minLat = lat - latDelta;
+    const maxLat = lat + latDelta;
+    const minLng = lng - lngDelta;
+    const maxLng = lng + lngDelta;
+
+    // First, get all salons within the bounding box
+    const salons = await Salon.find({
+      isActive: true,
+      "location.latitude": { $gte: minLat, $lte: maxLat },
+      "location.longitude": { $gte: minLng, $lte: maxLng },
+    })
+      .select("-reviews -serviceCategories.services")
+      .lean(); // Use lean() for better performance
+
+    // Calculate distance and filter within radius
+    const nearbySalons = salons.filter((salon) => {
+      const salonLat = salon.location.latitude;
+      const salonLng = salon.location.longitude;
+
+      // Haversine formula for distance calculation
+      const dLat = ((salonLat - lat) * Math.PI) / 180;
+      const dLng = ((salonLng - lng) * Math.PI) / 180;
+
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat * Math.PI) / 180) *
+          Math.cos((salonLat * Math.PI) / 180) *
+          Math.sin(dLng / 2) *
+          Math.sin(dLng / 2);
+
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = earthRadius * c;
+
+      // Add distance to salon object
+      salon.distance = parseFloat(distance.toFixed(2));
+      return distance <= radiusInKm;
+    });
+
+    // Sort by distance
+    nearbySalons.sort((a, b) => a.distance - b.distance);
+
+    res.status(200).json({
+      success: true,
+      count: nearbySalons.length,
+      radius: radiusInKm,
+      userLocation: { latitude: lat, longitude: lng },
+      data: nearbySalons,
+    });
+  } catch (error) {
+    console.log("🚀 -> getNearbySalons -> error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Get single salon by ID
 // @route   GET /api/salons/:id
 // @access  Public
@@ -231,4 +311,5 @@ module.exports = {
   createSalon,
   updateSalon,
   deleteSalon,
+  getNearbySalons,
 };

@@ -15,27 +15,25 @@ const UserSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
     },
-    username: {
-      type: String,
-      // required: true,
-      match: [/^[a-zA-Z0-9_]{3,30}$/, "Please provide a valid username"],
-      unique: true,
-    },
     name: {
       type: String,
       maxlength: 50,
-      minlength: 3,
     },
     userImage: {
       type: String,
     },
-    bio: {
+    addressLine1: {
       type: String,
     },
-    followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-    following: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-    password: {
+    addressLine2: {
       type: String,
+    },
+    addressType: {
+      type: String,
+      enum: ["Home", "Work", "Other"],
+    },
+    dateOfBirth: {
+      type: Date,
     },
   },
   { timestamps: true }

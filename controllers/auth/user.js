@@ -90,22 +90,71 @@ const updateProfile = async (req, res) => {
     throw new NotFoundError("User not found");
   }
 
-  const { name, bio, userImage } = req.body;
+  const {
+    name,
+    userImage,
+    email,
+    addressLine1,
+    addressLine2,
+    addressType,
+    dateOfBirth,
+  } = req.body;
 
-  if (!name && !bio && !userImage) {
-    throw new BadRequestError("No Update Fields provided");
+  // Check if at least one field is provided
+  if (
+    !name &&
+    !userImage &&
+    !email &&
+    !addressLine1 &&
+    !addressLine2 &&
+    !addressType &&
+    !dateOfBirth
+  ) {
+    throw new BadRequestError("No update fields provided");
   }
 
   try {
-    if (name) user.name = name;
-    if (bio) user.bio = bio;
-    if (userImage) user.userImage = userImage;
+    // Update fields only if they are provided in the request
+    if (name !== undefined) user.name = name;
+    if (userImage !== undefined) user.userImage = userImage;
+    if (email !== undefined) user.email = email;
+    if (addressLine1 !== undefined) user.addressLine1 = addressLine1;
+    if (addressLine2 !== undefined) user.addressLine2 = addressLine2;
+    if (addressType !== undefined) user.addressType = addressType;
+    if (dateOfBirth !== undefined) user.dateOfBirth = dateOfBirth;
 
     await user.save();
 
-    res.status(StatusCodes.OK).json({ msg: "Profile updated successfully" });
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: {
+        id: user._id,
+        phoneNumber: user.phoneNumber,
+        email: user.email,
+        name: user.name,
+        userImage: user.userImage,
+        addressLine1: user.addressLine1,
+        addressLine2: user.addressLine2,
+        addressType: user.addressType,
+        dateOfBirth: user.dateOfBirth,
+      },
+    });
   } catch (error) {
-    throw new BadRequestError(error);
+    console.error("Update profile error:", error);
+
+    // Handle duplicate email error
+    if (error.code === 11000 && error.keyPattern?.email) {
+      throw new BadRequestError("Email already exists");
+    }
+
+    // Handle validation errors
+    if (error.name === "ValidationError") {
+      const errors = Object.values(error.errors).map((err) => err.message);
+      throw new BadRequestError(`Validation failed: ${errors.join(", ")}`);
+    }
+
+    throw new BadRequestError("Failed to update profile");
   }
 };
 

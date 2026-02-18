@@ -22,12 +22,14 @@ const feedRouter = require("./routes/feed");
 const user = require("./routes/user");
 const replyRouter = require("./routes/reply");
 const shareRouter = require("./routes/share");
+const salonRouter = require("./routes/salonRoutes");
 
 app.use("/auth", authRouter);
 app.use("/oauth", oauthRouter);
 app.use("/file", fileRouter);
 app.use("/share", shareRouter);
 app.use("/user", authMiddleware, user);
+app.use("/salons", salonRouter);
 app.use("/comment", authMiddleware, commentRouter);
 app.use("/reply", authMiddleware, replyRouter);
 app.use("/like", authMiddleware, likeRouter);

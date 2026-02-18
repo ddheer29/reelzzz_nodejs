@@ -6,10 +6,13 @@ const {
   createSalon,
   updateSalon,
   deleteSalon,
+  getNearbySalons,
 } = require("../controllers/salon/salonController");
 
 // GET /salons - Get all salons
 router.get("/", getAllSalons);
+
+router.get("/nearby", getNearbySalons);
 
 // GET /salons/:id - Get single salon by ID
 router.get("/:id", getSalonById);
